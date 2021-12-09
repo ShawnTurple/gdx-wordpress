@@ -1,0 +1,55 @@
+version: '3'
+# docker compose --env-file .env up --build site --force-recreate
+networks: 
+    wp_deploy:
+
+services:
+    site:
+        build:
+            context: .
+            dockerfile: nginx.dockerfile
+            args:
+                - NGINX_VERSION=${NGINX_VERSION:-latest}
+        container_name: nginx
+        ports: 
+            - 80:80
+        links:
+            - wp-fpm
+        depends_on:
+            - wp-fpm
+            - db
+        networks:
+            - wp_deploy
+    db:
+        image: mysql:${MYSQL_VERSION}
+        logging:
+            driver: none
+        environment:
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+        networks:
+            - wp_deploy
+    wp-fpm:
+        image: wordpress:${WORDPRESS_VERSION}
+        environment:
+            WORDPRESS_DB_HOST: ${MYSQL_HOST}
+            WORDPRESS_DB_USER: ${MYSQL_USER}
+            WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+            WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+            WORDPRESS_CONFIG_EXTRA: |
+                /* Multisite */
+                define('WP_ALLOW_MULTISITE', ${WP_ALLOW_MULTISITE:-false} );
+                define('MULTISITE', ${MULTISITE:-false});
+                define('SUBDOMAIN_INSTALL', ${SUBDOMAIN_INSTALL:-false});
+                define('WP_HOME', '${DOMAIN_CURRENT_SITE}');
+                define('WP_SITEURL', '${DOMAIN_CURRENT_SITE}');
+                define('DOMAIN_CURRENT_SITE', '${DOMAIN_CURRENT_SITE}');
+                define('PATH_CURRENT_SITE', '${PATH_CURRENT_SITE:-/}');
+                define('SITE_ID_CURRENT_SITE', 1);
+                define('BLOG_ID_CURRENT_SITE', 1);
+        networks:
+            - wp_deploy
+        depends_on:
+            - db
